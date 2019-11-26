@@ -1,6 +1,5 @@
 #!/usr/bin/python3
 import sys
-sys.path.append(sys.path[0] + "/..")
 import importlib
 import inspect
 import time
@@ -70,6 +69,13 @@ class Date():
         return inputData
 
     def _parse(self, inputString, **argument):
+        if 'input' in argument:
+            argument['inputFormat'] = argument['input']
+        if 'output' in argument:
+            argument['outputFormat'] = argument['output']
+        if 'month' in argument:
+            argument['replace'] = argument['month']
+
         self.inputString = inputString
         self.dt = None
 
@@ -109,7 +115,7 @@ class Date():
                 except Exception as e:
                     continue
             if self.dt is None:
-                print('[WARNING] ValueError: {} does not match format {}'.foramt(self.inputString, str(inputFormat)))
+                print('[WARNING] ValueError: {} does not match format {}'.format(self.inputString, str(inputFormat)))
             return self
 
         if inputFormat == '%s':
@@ -118,7 +124,6 @@ class Date():
 
         originString = self.inputString
         if minguo:
-            print( originString )
             try:
                 # year < minguo 100
                 minguoFormat = inputFormat.replace('%Y', '%y')
@@ -132,7 +137,7 @@ class Date():
         try:
             self.dt = datetime.strptime(originString, inputFormat)
         except Exception as e:
-            print('[WARNING] ValueError: {} does not match format {}'.foramt(self.inputString, str(inputFormat)))
+            print('[WARNING] ValueError: {} does not match format {}'.format(self.inputString, str(inputFormat)))
 
         return self
 
