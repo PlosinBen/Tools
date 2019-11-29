@@ -10,32 +10,26 @@ class Date():
     closureFormat = '%Y-%m-%d'
     def __init__(self,
             inputFormat='%Y-%m-%d',
-            input = None,
             outputFormat='%Y-%m-%d',
-            output = None,
-
             frequency='d', 
-
             replace:dict = {'q1':'01', 'q2':'04', 'q3':'07', 'q4':'10'},
             month = None,
-
             span: int = 0,
             minguo: bool = False,
             response = 'str',
-            
             delta:dict = None,
             errors:str = 'raise',
             onError = None
         ):
 
         self.originParseConfig = {
-            'inputFormat': inputFormat if input is None else input,
-            'outputFormat': outputFormat if output is None else output,
+            'inputFormat': inputFormat,
+            'outputFormat': outputFormat,
             'span': span,
             'frequency': frequency,
             'minguo': minguo,
             'response': response,
-            'replace': replace if month is None else month,
+            'replace': replace,
             'delta': delta,
             'errors': errors,
             'onError': onError
@@ -73,13 +67,6 @@ class Date():
         return inputData
 
     def _parse(self, inputString, **argument):
-        if 'input' in argument:
-            argument['inputFormat'] = argument['input']
-        if 'output' in argument:
-            argument['outputFormat'] = argument['output']
-        if 'month' in argument:
-            argument['replace'] = argument['month']
-
         self.inputString = inputString
         self.dt = None
 
@@ -181,7 +168,7 @@ class Date():
             'str': self.dt.strftime( outputFormat ),
             'datetime': self.dt,
             'timestamp': int(time.mktime(self.dt.timetuple()))
-        }.get(response)
+        }.get(response, self.dt)
 
     def today(self, **argument):
         minguo = argument.get('minguo', False)
@@ -221,7 +208,7 @@ if __name__ == '__main__':
     date = Date(frequency='q', span=-2)
     print(originDate + ' freq=q span=-2: ', date.parse(originDate) )
 
-    date = Date('%Y %d %m', frequency='m', span=1, month={
+    date = Date('%Y %d %m', frequency='m', span=1, replace={
         'Jan.': '03'
         })
     print('2018 5 Jan. freq=m span=1 month={Jan.:03}: ',  date.parse('2018 5 Jan.') )
