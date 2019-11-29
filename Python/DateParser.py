@@ -23,7 +23,9 @@ class Date():
             minguo: bool = False,
             response = 'str',
             
-            delta:dict = None
+            delta:dict = None,
+            errors:str = 'raise',
+            onError = None
         ):
 
         self.originParseConfig = {
@@ -34,7 +36,9 @@ class Date():
             'minguo': minguo,
             'response': response,
             'replace': replace if month is None else month,
-            'delta': delta
+            'delta': delta,
+            'errors': errors,
+            'onError': onError
         }
 
     def _loadPackages(self):
@@ -87,11 +91,19 @@ class Date():
             self._formatResponse,
         ]
 
-        for process in pipeProcess:
-            methodSignature = inspect.signature(process)
-            pipeParams = { param.name: argument.get( param.name ) if param.name in argument else self.originParseConfig.get( param.name ) for param in methodSignature.parameters.values() }
-            result = process( **pipeParams )
-        return result
+        try:
+            for process in pipeProcess:
+                methodSignature = inspect.signature(process)
+                pipeParams = { param.name: argument.get( param.name ) if param.name in argument else self.originParseConfig.get( param.name ) for param in methodSignature.parameters.values() }
+                result = process( **pipeParams )
+            return result
+        except Exception as e:
+            errors = argument.get('errors') if 'errors' in argument else self.originParseConfig.get('errors')
+            onError = argument.get('onError') if 'onError' in argument else self.originParseConfig.get('onError')
+            if errors == 'raise':
+                raise ValueError(str(e))
+            elif errors == 'coerce':
+                return onError
 
     def _initInputString(self):
         self.inputString = str(self.inputString).lower()
@@ -110,12 +122,11 @@ class Date():
             for formatPart in inputFormat:
                 try:
                     self._readInputDate(formatPart, minguo)
-                    print( self.dt )
                     break
                 except Exception as e:
                     continue
             if self.dt is None:
-                print('[WARNING] ValueError: {} does not match format {}'.format(self.inputString, str(inputFormat)))
+                raise ValueError('{} does not match format {}'.format(self.inputString, str(inputFormat)))
             return self
 
         if inputFormat == '%s':
@@ -137,7 +148,7 @@ class Date():
         try:
             self.dt = datetime.strptime(originString, inputFormat)
         except Exception as e:
-            print('[WARNING] ValueError: {} does not match format {}'.format(self.inputString, str(inputFormat)))
+            raise ValueError('[{}] cannot strptime to [{}]'.format(self.inputString, str(inputFormat)))
 
         return self
 
@@ -173,11 +184,13 @@ class Date():
         }.get(response)
 
     def today(self, **argument):
-        argument['intpuFormat'] = self.closureFormat
+        minguo = argument.get('minguo', False)
         argument['minguo'] = False
+
+        argument['intpuFormat'] = self.closureFormat
         result = self.parse(datetime.now(), **argument)
 
-        if self.originParseConfig.get('minguo') or argument.get('minguo') == True:
+        if self.originParseConfig.get('minguo') or minguo == True:
             result = result.replace( str(self.dt.year), str(self.dt.year - 1911))
         return result
 
@@ -190,7 +203,7 @@ if __name__ == '__main__':
     date = Date('%Y/%m/%d')
     print('2018/05/05 input parse: ', date.parse('2018/05/05') )
 
-    date = Date(output='%d-%m-%Y')
+    date = Date(outputFormat='%d-%m-%Y')
     print(originDate + ' output parse: ', date.parse(originDate) )
 
     date = Date(frequency='y', span=1)
@@ -237,4 +250,4 @@ if __name__ == '__main__':
     print("201802 respnose time object ",  date.parse('201802', response='time') )
     print("201802 respnose datetime object ",  date.parse('201802', response='datetime') )
 
-    print("get today", date.today() )
+    print("get today", today(minguo=True) )
