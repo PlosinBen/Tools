@@ -3,7 +3,8 @@ import sys
 import importlib
 import inspect
 import time
-from datetime import datetime
+import datetime
+import warnings
 
 #init packages
 _packages = []
@@ -22,6 +23,60 @@ for packageName, packageImportPamras in {
             importModule = getattr(importModule, packageImportPamras[1])
         setattr(sys.modules[__name__], packageName, importModule)
         _packages.append(packageName)
+
+class DateTimeDelta():
+    def __init__(self, 
+            years=0, months=0, 
+            #origin datetime.timedelta suport
+            days=0, seconds=0, microseconds=0, milliseconds=0, minutes=0, hours=0, weeks=0
+        ):
+        self.years = years
+        self.months = months
+        self.days = days
+        self.weeks = weeks
+
+        self.seconds = seconds
+        self.microseconds = microseconds
+        self.milliseconds = milliseconds
+        self.minutes = minutes
+        self.hours = hours
+
+    def __radd__(self, dt:datetime):
+        dt = self.spanYearsMonths(dt)
+        return self.spanTimedelta(dt)
+
+    def __rsub__(self, dt:datetime):
+        dt = self.spanYearsMonths(dt, -1)
+        return self.spanTimedelta(dt, -1)
+
+    def spanTimedelta(self, dt, operator:int = 1):
+        delta = datetime.timedelta(self.days, self.seconds, self.microseconds, self.milliseconds, self.minutes, self.hours, self.weeks)
+        if operator == -1:
+            return dt - delta
+        return dt + delta
+
+    def spanYearsMonths(self, dt, operator:int = 1):
+        year = dt.year
+        month = dt.month
+
+        month += self.months * operator
+        year += self.years * operator
+        if month > 12:
+            year += month // 12
+            month = month % 12
+
+        if month < 1:
+            year -= abs(month // 12) + 1
+            month = 12 - ( month % 12 )
+
+        return dt.replace(year=year, month=month)
+
+def makeDateTimeDelta(**argument):
+    if 'relativedelta' in _packages:
+        return relativedelta(**argument)
+    else:
+        warnings.warn("[Warning]recommended datetime delta use 'dateutil.relativedelta'", DeprecationWarning)
+        return DateTimeDelta(**argument)
 
 class Date():
     closureFormat = '%Y-%m-%d'
@@ -67,7 +122,7 @@ class Date():
 
         if isinstance(inputData, list):
             return [ self.parse(inputString, **argument) for inputString in inputData ]
-        elif isinstance(inputData, datetime):
+        elif isinstance(inputData, datetime.datetime):
             argument['inputFormat'] = self.closureFormat
             return self.parse(inputData.strftime(argument['inputFormat']), **argument)
         elif isinstance(inputData, str):
@@ -126,7 +181,7 @@ class Date():
             return self
 
         if inputFormat == '%s':
-            self.dt = datetime.fromtimestamp(int(self.inputString))
+            self.dt = datetime.datetime.fromtimestamp(int(self.inputString))
             return self
 
         originString = self.inputString
@@ -134,15 +189,15 @@ class Date():
             try:
                 # year < minguo 100
                 minguoFormat = inputFormat.replace('%Y', '%y')
-                year = datetime.strptime(originString, minguoFormat).strftime('%y')
+                year = datetime.datetime.strptime(originString, minguoFormat).strftime('%y')
             except Exception as e:
                 # year > minguo 100
                 minguoFormat = inputFormat.replace('%Y', '%j')
-                year = datetime.strptime(originString, minguoFormat).strftime('%j')
+                year = datetime.datetime.strptime(originString, minguoFormat).strftime('%j')
             originString = originString.replace(year, str( int(year) + 1911 ))
 
         try:
-            self.dt = datetime.strptime(originString, inputFormat)
+            self.dt = datetime.datetime.strptime(originString, inputFormat)
         except Exception as e:
             raise ValueError('[{}] cannot strptime to [{}]'.format(self.inputString, str(inputFormat)))
 
@@ -150,25 +205,26 @@ class Date():
 
     def _formatFrequencyAndSpan(self, frequency:str, span:int, delta:dict):
         dt = self.dt
-        span = span
+        span = 0 if span is None else span
+
         if frequency == 'y':
-            dt = dt.replace(month=1, day=1)
-            datetimeDelta = relativedelta(years=span)
+            dt = dt.replace(year=dt.year + span, month=1, day=1)
+            datetimeDelta = makeDateTimeDelta(years=span)
         elif frequency == 'm':
             dt = dt.replace(day=1)
-            datetimeDelta = relativedelta(months=span)
+            datetimeDelta = makeDateTimeDelta(months=span)
         elif frequency == 'q':
             dt = dt.replace(month=((dt.month - 1) // 3)*3 + 1, day=1)
-            datetimeDelta = relativedelta(months=span*3)
+            datetimeDelta = makeDateTimeDelta(months=span*3)
         elif frequency == 'd':
-            datetimeDelta = relativedelta(days=span)
+            datetimeDelta = makeDateTimeDelta(days=span)
         elif frequency == 'w':
-            datetimeDelta = relativedelta(months=span*7)
-        
+            datetimeDelta = makeDateTimeDelta(months=span*7)
+
         self.dt = dt + datetimeDelta
         if delta is not None:
             #years=0, months=0, days=0, leapdays=0, weeks=0, hours=0, minutes=0, seconds=0, microseconds=0
-            self.dt += relativedelta(**delta)
+            self.dt += makeDateTimeDelta(**delta)
 
         return self
 
@@ -184,7 +240,7 @@ class Date():
         argument['minguo'] = False
 
         argument['intpuFormat'] = self.closureFormat
-        result = self.parse(datetime.now(), **argument)
+        result = self.parse(datetime.datetime.now(), **argument)
 
         if self.originParseConfig.get('minguo') or minguo == True:
             result = result.replace( str(self.dt.year), str(self.dt.year - 1911))
@@ -195,6 +251,7 @@ def today(**argument):
 
 if __name__ == '__main__':
     originDate = '2018-05-05'
+
 
     date = Date('%Y/%m/%d')
     print('2018/05/05 input parse: ', date.parse('2018/05/05') )
@@ -227,6 +284,9 @@ if __name__ == '__main__':
 
     date = Date('%Y%m')
     print('2018Q3 default quarterly to month: ',  date.parse('2018Q3') )
+
+    date = Date('%Y-%m-%d', delta={'months':-1, 'days':1})
+    print('2018-01-01 delta -1 month & 1 day: ',  date.parse('2018-01-01') )
 
     date = Date(minguo=True)
     print('107-02-01 minguo year nad quarterly: ',  date.parse('107-02-01') )
