@@ -4,7 +4,24 @@ import importlib
 import inspect
 import time
 from datetime import datetime
-from dateutil.relativedelta import relativedelta
+
+#init packages
+_packages = []
+for packageName, packageImportPamras in {
+            #name, import params
+            #like import pandas as pandas
+            'pandas': 'pandas',
+            #like from dateutil.relativedelta import relativedelta as relativedelta
+            'relativedelta': ('dateutil.relativedelta', 'relativedelta')
+        }.items():
+    packageImportPamras = (packageImportPamras, ) if isinstance(packageImportPamras, str) else packageImportPamras
+    if importlib.util.find_spec(packageImportPamras[0]) is not None:
+        importModule = importlib.import_module(packageImportPamras[0])
+
+        if len(packageImportPamras) > 1:
+            importModule = getattr(importModule, packageImportPamras[1])
+        setattr(sys.modules[__name__], packageName, importModule)
+        _packages.append(packageName)
 
 class Date():
     closureFormat = '%Y-%m-%d'
@@ -35,21 +52,13 @@ class Date():
             'onError': onError
         }
 
-    def _loadPackages(self):
-        self.packages = []
-        packages = ['pandas']
-        for packageName in packages:
-            if importlib.util.find_spec(packageName) is not None:
-                setattr(sys.modules[__name__], packageName,  importlib.import_module(packageName))
-                self.packages.append(packageName)
-
     def parse(self, inputData, **argument):
-        self._loadPackages()
-
-        if 'pandas' in self.packages:
+        global _packages
+        if 'pandas' in _packages:
 
             if isinstance(inputData, pandas.DatetimeIndex):
-                inputData = inputData.strftime(self.inputFormat).to_series()
+                argument['inputFormat'] = self.closureFormat
+                inputData = inputData.strftime(argument['inputFormat']).to_series()
             elif isinstance(inputData, pandas.Index):
                 inputData = inputData.to_series()
 
